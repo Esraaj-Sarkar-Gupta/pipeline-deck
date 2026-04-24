@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plaksha Orbital Pipeline Deck Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body
+    class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 font-sans min-h-screen p-8 relative overflow-hidden">
+    <!-- Ambient background glows -->
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/20 blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/20 blur-[120px]">
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto space-y-8">
+        <header class="border-b border-slate-700 pb-4">
+            <h1 class="text-3xl font-bold text-blue-400">Plaksha Orbital Pipeline Deck</h1>
+            <p class="text-slate-400 mt-2">Single-issue, in-order pipeline simulator for RAW hazard detection.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="space-y-6 lg:col-span-1">
+
+                <div class="glass-panel p-6 rounded-xl border border-slate-700/50">
+                    <h2 class="text-xl font-semibold mb-4">Pipeline Configuration</h2>
+                    <label class="block mb-2 text-sm text-slate-400">Pipeline Type:</label>
+                    <select id="pipeline-type"
+                        class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white mb-4">
+                        <option value="5">5-Stage (IF, ID, EX, MEM, WB)</option>
+                        <option value="4">4-Stage (IF, ID, EX, MEM/WB)</option>
+                    </select>
+
+                    <label class="flex items-center space-x-2 text-sm">
+                        <input type="checkbox" id="enable-forwarding"
+                            class="form-checkbox bg-slate-900 border-slate-600 text-blue-500 rounded">
+                        <span>Enable Data Forwarding</span>
+                    </label>
+                </div>
+
+                <div class="glass-panel p-6 rounded-xl border border-slate-700/50">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold">Instructions</h2>
+                        <select id="preset-dropdown"
+                            class="bg-slate-900 border border-slate-600 rounded p-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+                            <option value="">Load Preset Example...</option>
+                            <option value="raw">RAW Hazard</option>
+                            <option value="war">WAR Hazard</option>
+                            <option value="waw">WAW Hazard</option>
+                            <option value="loaduse">Load-Use Hazard</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-4">Max 10 instructions. Supported: ADD, SUB, LW, SW.</p>
+
+                    <textarea id="instruction-input" rows="8"
+                        class="w-full bg-slate-900/80 border border-slate-600 rounded p-3 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all custom-scrollbar"
+                        placeholder="ADD R1, R2, R3&#10;SUB R4, R1, R5&#10;LW R1, 0(R2)"></textarea>
+
+                    <div class="mt-4 flex space-x-3">
+                        <button id="btn-parse"
+                            class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95">Load</button>
+                        <button id="btn-reset"
+                            class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2.5 px-4 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95">Reset</button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-xl border border-slate-700/50">
+                    <h2 class="text-xl font-semibold mb-4">Execution</h2>
+                    <div class="flex space-x-3">
+                        <button id="btn-step"
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none"
+                            disabled>Step</button>
+                        <button id="btn-run"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none"
+                            disabled>Auto-Run</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6 lg:col-span-2">
+                <div
+                    class="bg-slate-800 p-5 rounded-lg border border-slate-700 overflow-x-auto min-h-[300px] custom-scrollbar">
+                    <h2 class="text-xl font-semibold mb-4">Pipeline Visualization</h2>
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead>
+                            <tr id="table-header" class="border-b border-slate-600 text-slate-400">
+                                <th class="py-2 px-4 font-medium">Inst</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <tr>
+                                <td colspan="100%" class="py-8 text-center text-slate-500 italic">Load instructions to
+                                    begin simulation.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="glass-panel p-6 rounded-xl border border-slate-700/50">
+                    <h2 class="text-xl font-semibold mb-4 text-red-400">Detected Hazards</h2>
+                    <ul id="hazard-log" class="list-disc list-inside text-sm text-slate-300 space-y-1">
+                        <li class="text-slate-500 italic">No hazards detected yet.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="pipeline.js"></script>
+    <script src="ui.js"></script>
+</body>
+
+</html>
