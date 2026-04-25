@@ -240,39 +240,122 @@ function drawForwardingArrows(simulator) {
     });
 }
 
+function scrollPipelineToCurrentCycle() {
+    const viewer = document.getElementById('pipeline-viewer');
+    if (!viewer) return;
+
+    requestAnimationFrame(() => {
+        viewer.scrollTo({
+            left: viewer.scrollWidth,
+            behavior: 'smooth'
+        });
+    });
+}
+
 // --- Event Listeners ---
 const simulator = new PipelineSimulator();
+const AUTO_RUN_DELAY_MS = 600;
+let autoRunTimer = null;
+let isAutoRunning = false;
+
+function setExecutionButtonsDisabled(disabled) {
+    document.getElementById('btn-step').disabled = disabled;
+    document.getElementById('btn-run').disabled = disabled;
+    document.getElementById('btn-restart').disabled = disabled;
+}
+
+function setInputControlsDisabled(disabled) {
+    document.getElementById('btn-parse').disabled = disabled;
+    document.getElementById('btn-reset').disabled = disabled;
+    document.getElementById('pipeline-type').disabled = disabled;
+    document.getElementById('enable-forwarding').disabled = disabled;
+    document.getElementById('preset-dropdown').disabled = disabled;
+    document.getElementById('instruction-input').disabled = disabled;
+}
+
+function stopAutoRun() {
+    if (autoRunTimer) {
+        clearTimeout(autoRunTimer);
+        autoRunTimer = null;
+    }
+
+    if (isAutoRunning) {
+        isAutoRunning = false;
+        document.getElementById('btn-run').innerText = 'Auto-Run';
+        setInputControlsDisabled(false);
+        const hasRunnableProgram = simulator.errors.length === 0 && simulator.instructions.length > 0;
+        setExecutionButtonsDisabled(!hasRunnableProgram);
+    }
+}
+
+function updateRunButtonAvailability() {
+    const hasRunnableProgram = simulator.errors.length === 0 && simulator.instructions.length > 0;
+    const hasMoreCycles = hasRunnableProgram && simulator.cycle < simulator.getMaxCycle();
+
+    document.getElementById('btn-step').disabled = !hasMoreCycles;
+    document.getElementById('btn-run').disabled = !hasMoreCycles;
+    document.getElementById('btn-restart').disabled = !hasRunnableProgram;
+}
+
+function autoRunNextCycle() {
+    if (!isAutoRunning) return;
+
+    if (simulator.cycle >= simulator.getMaxCycle()) {
+        stopAutoRun();
+        updateRunButtonAvailability();
+        return;
+    }
+
+    simulator.step();
+    updateUI(simulator);
+    scrollPipelineToCurrentCycle();
+
+    if (simulator.cycle >= simulator.getMaxCycle()) {
+        stopAutoRun();
+        updateRunButtonAvailability();
+        return;
+    }
+
+    autoRunTimer = setTimeout(autoRunNextCycle, AUTO_RUN_DELAY_MS);
+}
 
 document.getElementById('btn-parse').addEventListener('click', () => {
+    stopAutoRun();
     const inputText = document.getElementById('instruction-input').value;
     simulator.pipelineType = parseInt(document.getElementById('pipeline-type').value);
     simulator.forwarding = document.getElementById('enable-forwarding').checked;
     
     simulator.loadInstructions(inputText.split('\n'));
     renderInitialTable(simulator);
-    
-    const hasErrors = simulator.errors.length > 0 || simulator.instructions.length === 0;
-    document.getElementById('btn-step').disabled = hasErrors;
-    document.getElementById('btn-run').disabled = hasErrors;
-    document.getElementById('btn-restart').disabled = hasErrors;
+    updateRunButtonAvailability();
 });
 
 document.getElementById('btn-step').addEventListener('click', () => {
+    stopAutoRun();
     simulator.step();
     updateUI(simulator);
+    updateRunButtonAvailability();
 });
 
 document.getElementById('btn-run').addEventListener('click', () => {
-    simulator.runToEnd();
-    updateUI(simulator);
+    if (isAutoRunning || simulator.instructions.length === 0 || simulator.errors.length > 0) return;
+
+    isAutoRunning = true;
+    document.getElementById('btn-run').innerText = 'Running...';
+    setInputControlsDisabled(true);
+    setExecutionButtonsDisabled(true);
+    autoRunTimer = setTimeout(autoRunNextCycle, AUTO_RUN_DELAY_MS);
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
+    stopAutoRun();
     simulator.resetRun();
     renderInitialTable(simulator);
+    updateRunButtonAvailability();
 });
 
 document.getElementById('btn-reset').addEventListener('click', () => {
+    stopAutoRun();
     document.getElementById('instruction-input').value = '';
     document.getElementById('preset-dropdown').value = '';
     simulator.instructions = [];
@@ -287,9 +370,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '<tr><td colspan="100%" class="py-8 text-center text-slate-500 italic">Load instructions to begin simulation.</td></tr>';
     
-    document.getElementById('btn-step').disabled = true;
-    document.getElementById('btn-run').disabled = true;
-    document.getElementById('btn-restart').disabled = true;
+    updateRunButtonAvailability();
 });
 
 const presets = {

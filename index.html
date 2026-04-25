@@ -55,11 +55,31 @@
                             <option value="loaduse">Load-Use Hazard</option>
                         </select>
                     </div>
-                    <p class="text-xs text-slate-400 mb-3">Max 10 instructions. Format: ADD/SUB rd, rs, rt; LW/SW rt, offset(base).</p>
+                    <p class="text-xs text-slate-400 mb-3">Max 10 instructions. Use one instruction per line.</p>
 
-                    <textarea id="instruction-input" rows="5"
-                        class="w-full bg-slate-900/80 border border-slate-600 rounded p-3 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all custom-scrollbar"
-                        placeholder="ADD R1, R2, R3&#10;SUB R4, R1, R5&#10;LW R1, 0(R2)"></textarea>
+                    <div class="relative">
+                        <textarea id="instruction-input" rows="5"
+                            class="w-full bg-slate-900/80 border border-slate-600 rounded p-3 pr-11 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all custom-scrollbar"
+                            placeholder="ADD R1, R2, R3&#10;SUB R4, R1, R5&#10;LW R1, 0(R2)"></textarea>
+
+                        <div class="command-help">
+                            <button type="button" class="command-help-icon" aria-label="Show accepted commands">i</button>
+                            <div class="command-help-popover" role="tooltip">
+                                <p class="mb-2 font-semibold text-slate-100">Accepted commands</p>
+                                <ul class="space-y-1 font-mono">
+                                    <li>ADD rd, rs, rt</li>
+                                    <li>SUB rd, rs, rt</li>
+                                    <li>AND rd, rs, rt</li>
+                                    <li>OR rd, rs, rt</li>
+                                    <li>ADDI rt, rs, imm</li>
+                                    <li>ORI rt, rs, imm</li>
+                                    <li>LW rt, offset(base)</li>
+                                    <li>SW rt, offset(base)</li>
+                                </ul>
+                                <p class="mt-2 text-slate-400">Registers: R1, R2, etc. Immediates and offsets: integers.</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="mt-3 flex flex-wrap gap-3">
                         <button id="btn-parse"
