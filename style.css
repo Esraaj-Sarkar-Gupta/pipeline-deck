@@ -24,6 +24,10 @@
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
+#pipeline-viewer {
+    position: relative;
+}
+
 /* Animations */
 @keyframes popIn {
     0% {
@@ -54,6 +58,7 @@
 
 /* Pipeline Stage Cells */
 .stage-cell {
+    min-height: 3rem;
     border-radius: 0.375rem;
     font-weight: 700;
     color: #ffffff;
@@ -63,12 +68,12 @@
     /* ensure animation works well */
     transform-origin: center;
     position: relative;
-    letter-spacing: 0.025em;
+    letter-spacing: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 0.25rem;
+    padding: 0.4rem 0.25rem;
 }
 
 .stage-cell:hover {
@@ -93,6 +98,22 @@
     );
     border: 1px solid #fca5a5;
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, pulseRed 2s infinite;
+}
+
+.stage-forward-source,
+.stage-forward-target {
+    border-color: #fbbf24;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 2px rgba(251, 191, 36, 0.45), 0 2px 8px rgba(251, 191, 36, 0.25);
+}
+
+.forwarding-overlay {
+    position: absolute;
+    inset: 0;
+    min-width: 100%;
+    min-height: 100%;
+    pointer-events: none;
+    z-index: 25;
+    overflow: visible;
 }
 
 /* Tooltip styles */
@@ -145,4 +166,59 @@
 }
 .pipeline-row:hover {
     background-color: rgba(51, 65, 85, 0.4);
+}
+
+.pipeline-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    position: relative;
+    z-index: 5;
+}
+
+.instruction-cell {
+    min-width: 12rem;
+    max-width: 16rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #1e293b;
+}
+
+thead .instruction-cell {
+    background: #1e293b;
+    z-index: 15;
+}
+
+.cycle-cell {
+    width: clamp(4.8rem, 8vw, 7rem);
+    min-width: 4.8rem;
+    max-width: 7rem;
+}
+
+@media (max-width: 640px) {
+    .instruction-cell {
+        min-width: 9.5rem;
+        max-width: 11rem;
+        font-size: 0.75rem;
+    }
+
+    .cycle-cell {
+        width: 4.5rem;
+        min-width: 4.5rem;
+    }
+
+    .stage-cell {
+        min-height: 2.55rem;
+        padding: 0.3rem 0.2rem;
+    }
+
+    .stage-cell span:first-child {
+        font-size: 0.75rem;
+    }
+
+    .stage-cell span:last-child {
+        display: none;
+    }
 }

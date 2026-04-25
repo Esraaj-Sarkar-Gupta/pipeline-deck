@@ -1,240 +1,476 @@
 /*
  * pipeline.js -- Pipeline Logic Datastructures
  *
- * Author: Esraaj Sarkar Gupta
- *
+ * Author: Esraaj Sarkar Gupta, Rohan Gupta, Kanishk Khandelwal
  */
 
+const ALU_OPS = new Set(['ADD', 'SUB', 'AND', 'OR']);
+const IMM_OPS = new Set(['ADDI', 'ORI']);
+const MAX_INSTRUCTIONS = 10;
+const REGISTER_PATTERN = /^R\d+$/i;
+const INTEGER_PATTERN = /^-?\d+$/;
 
-/* ---- Instruction Data Structure ---- */
-class Instruction{
-    // Data structure for each instruction
+class Instruction {
     constructor(rawText, id) {
         this.id = id;
         this.rawText = rawText.trim();
-        
         this.opcode = null;
-
         this.dest = null;
         this.src1 = null;
-        this.scr2 = null;
-
+        this.src2 = null;
+        this.sources = [];
+        this.kind = 'UNKNOWN';
+        this.valid = true;
+        this.error = '';
+        this.schedule = [];
         this.stages = [];
+        this.timing = {};
     }
 }
 
-/* ---- Pipeline Data Structure & Methods ---- */
 class PipelineSimulator {
     constructor() {
-        this.instructions = []; // Array holds all the instruction objects
+        this.instructions = [];
         this.cycle = 0;
-        this.pipelineType = 5; // Assume 5 stage pipeline by default
-        this.forwarding = false; // Assume no register forwarding by default
+        this.pipelineType = 5;
+        this.forwarding = false;
         this.hazards = [];
+        this.fullHazards = [];
+        this.forwardingEvents = [];
+        this.visibleForwardingEvents = [];
+        this.errors = [];
+    }
+
+    getStages() {
+        return this.pipelineType === 5 ? ['IF', 'ID', 'EX', 'MEM', 'WB'] : ['IF', 'ID', 'EX', 'MEM/WB'];
+    }
+
+    getDisplayStage(stage) {
+        return this.pipelineType === 4 && stage === 'MEM' ? 'MEM/WB' : stage;
     }
 
     loadInstructions(rawTextArray) {
-        /*
-         * Parses a raw text block into an array of instructions.
-         */
-
-        const validLines = rawTextArray.filter(line => line.trim() !== '').slice(0, 10);
-        this.instructions = validLines.map((line, idx) => {
-            const inst = new Instruction(line, `I${idx + 1}`);
-            this.parseInstruction(inst); // Use parsing function
+        const nonEmptyLines = rawTextArray
+            .map((line, idx) => ({ text: line.trim(), lineNumber: idx + 1 }))
+            .filter(line => line.text !== '');
+        const candidateLines = nonEmptyLines.slice(0, MAX_INSTRUCTIONS);
+        const parsedInstructions = candidateLines.map((line, idx) => {
+            const inst = new Instruction(line.text, `I${idx + 1}`);
+            inst.lineNumber = line.lineNumber;
+            this.parseInstruction(inst);
             return inst;
         });
 
-        // Reset the deck clock and logs for a fresh run
+        this.instructions = [];
         this.cycle = 0;
         this.hazards = [];
+        this.fullHazards = [];
+        this.forwardingEvents = [];
+        this.visibleForwardingEvents = [];
+        const countErrors = nonEmptyLines.length > MAX_INSTRUCTIONS
+            ? [`Maximum ${MAX_INSTRUCTIONS} instructions allowed; received ${nonEmptyLines.length}.`]
+            : [];
+        const parseErrors = parsedInstructions
+            .filter(inst => !inst.valid)
+            .map(inst => `Line ${inst.lineNumber}: "${inst.rawText}" could not be parsed. ${inst.error}`);
+        this.errors = countErrors.concat(parseErrors);
+
+        if (this.errors.length > 0) {
+            return;
+        }
+
+        this.instructions = parsedInstructions;
+        this.buildSchedule();
+    }
+
+    normalizeRegister(registerName) {
+        return registerName ? registerName.toUpperCase() : null;
     }
 
     parseInstruction(inst) {
-        /*
-         * Parse human readable text into machine readable data
-         */
+        const raw = inst.rawText.trim();
+        const opcode = raw.split(/\s+/, 1)[0]?.toUpperCase() || null;
+        inst.opcode = opcode;
 
-        // Basic cleaning and splitting
-        const normalized = inst.rawText.toUpperCase().replace(/[,()]/g, ' ').replace(/\s+/g, ' ').trim();
-        const parts = normalized.split(' ');
-
-        // Edge case handling
-        if (parts.length === 0) return;
-        inst.opcode = parts[0];
-
-        // MIPS formatting
-        if (inst.opcode === 'ADD' || inst.opcode === 'SUB') {
-            inst.dest = parts[1];         // Result register
-            inst.src1 = parts[2];         // Number 1
-            inst.src2 = parts[3];         // Number 2
-        } else if (inst.opcode === 'LW') {
-            inst.dest = parts[1];         // Load Register
-            inst.src1 = parts[3];         // The base address register -- ignore offset here 
-        } else if (inst.opcode === 'SW') {
-            inst.src1 = parts[1];         // Register is read to be written into memory
-            inst.src2 = parts[3];         // The base address register 
-            inst.dest = null;
+        if (ALU_OPS.has(inst.opcode)) {
+            const match = raw.match(/^([A-Za-z]+)\s+([^,\s]+)\s*,\s*([^,\s]+)\s*,\s*([^,\s]+)\s*$/);
+            if (!match) {
+                this.rejectInstruction(inst, `Expected ${inst.opcode} rd, rs, rt`);
+                return;
+            }
+            const [, , dest, src1, src2] = match;
+            if (![dest, src1, src2].every(register => REGISTER_PATTERN.test(register))) {
+                this.rejectInstruction(inst, 'Registers must use R<number> format, e.g. R1');
+                return;
+            }
+            inst.dest = this.normalizeRegister(dest);
+            inst.src1 = this.normalizeRegister(src1);
+            inst.src2 = this.normalizeRegister(src2);
+            inst.sources = [inst.src1, inst.src2];
+            inst.kind = 'ALU';
+            return;
         }
+
+        if (IMM_OPS.has(inst.opcode)) {
+            const match = raw.match(/^([A-Za-z]+)\s+([^,\s]+)\s*,\s*([^,\s]+)\s*,\s*([^,\s]+)\s*$/);
+            if (!match) {
+                this.rejectInstruction(inst, `Expected ${inst.opcode} rt, rs, imm`);
+                return;
+            }
+            const [, , dest, src1, imm] = match;
+            if (![dest, src1].every(register => REGISTER_PATTERN.test(register))) {
+                this.rejectInstruction(inst, 'Registers must use R<number> format, e.g. R1');
+                return;
+            }
+            if (!INTEGER_PATTERN.test(imm)) {
+                this.rejectInstruction(inst, 'Immediate must be an integer');
+                return;
+            }
+            inst.dest = this.normalizeRegister(dest);
+            inst.src1 = this.normalizeRegister(src1);
+            inst.src2 = imm;
+            inst.sources = [inst.src1];
+            inst.kind = 'ALU';
+            return;
+        }
+
+        if (inst.opcode === 'LW') {
+            const match = raw.match(/^LW\s+([^,\s]+)\s*,\s*([+-]?\d+)\s*\(\s*([^) \t]+)\s*\)\s*$/i);
+            if (!match) {
+                this.rejectInstruction(inst, 'Expected LW rt, offset(base)');
+                return;
+            }
+            const [, dest, , base] = match;
+            if (![dest, base].every(register => REGISTER_PATTERN.test(register))) {
+                this.rejectInstruction(inst, 'Registers must use R<number> format, e.g. R1');
+                return;
+            }
+            inst.dest = this.normalizeRegister(dest);
+            inst.src1 = this.normalizeRegister(base);
+            inst.sources = [inst.src1];
+            inst.kind = 'LOAD';
+            return;
+        }
+
+        if (inst.opcode === 'SW') {
+            const match = raw.match(/^SW\s+([^,\s]+)\s*,\s*([+-]?\d+)\s*\(\s*([^) \t]+)\s*\)\s*$/i);
+            if (!match) {
+                this.rejectInstruction(inst, 'Expected SW rt, offset(base)');
+                return;
+            }
+            const [, data, , base] = match;
+            if (![data, base].every(register => REGISTER_PATTERN.test(register))) {
+                this.rejectInstruction(inst, 'Registers must use R<number> format, e.g. R1');
+                return;
+            }
+            inst.dest = null;
+            inst.src1 = this.normalizeRegister(data);
+            inst.src2 = this.normalizeRegister(base);
+            inst.sources = [inst.src1, inst.src2];
+            inst.kind = 'STORE';
+            return;
+        }
+
+        this.rejectInstruction(inst, `Unsupported instruction "${inst.opcode || inst.rawText}"`);
     }
 
-    /* ---- The Tick Advancements ---- */
-    step() {
-        /*
-         * This function advances the tick of the simulated computer by
-         * a single tick every time it is run.
-         */
+    rejectInstruction(inst, error) {
+        inst.valid = false;
+        inst.error = error;
+        inst.sources = [];
+        inst.kind = 'UNKNOWN';
+    }
 
-        // End return case
-        if(this.instructions.length === 0) return;
+    hasRawDependency(olderInst, inst) {
+        return Boolean(
+            olderInst.dest &&
+            inst.sources.some(source => source && source === olderInst.dest)
+        );
+    }
 
-        this.cycle++; // Increment ticks on the clock
+    getDependencyUses(olderInst, inst) {
+        if (!olderInst.dest) return [];
 
-        // Define stages based on pipeline type flag
-        const pStages = this.pipelineType === 5 ? ['IF', 'ID', 'EX', 'MEM', 'WB'] : ['IF', 'ID', 'EX', 'MEM_WB'];
+        if (inst.opcode === 'SW') {
+            const uses = [];
+            if (inst.src1 === olderInst.dest) {
+                uses.push({ register: inst.src1, targetStage: 'MEM', role: 'store data' });
+            }
+            if (inst.src2 === olderInst.dest) {
+                uses.push({ register: inst.src2, targetStage: 'EX', role: 'base address' });
+            }
+            return uses;
+        }
 
-        // Read history -- last cycles
-        const prevStates = this.instructions.map(inst => inst.stages[this.cycle - 2] || '');
+        return inst.sources
+            .filter(source => source && source === olderInst.dest)
+            .map(source => ({ register: source, targetStage: 'EX', role: 'ALU/input operand' }));
+    }
 
-        // Iterate through each stage in sequence
+    getInstructionUses(inst) {
+        if (inst.opcode === 'SW') {
+            return [
+                { register: inst.src1, targetStage: 'MEM', role: 'store data' },
+                { register: inst.src2, targetStage: 'EX', role: 'base address' }
+            ].filter(use => use.register);
+        }
+
+        return [...new Set(inst.sources)]
+            .filter(Boolean)
+            .map(source => ({ register: source, targetStage: 'EX', role: 'ALU/input operand' }));
+    }
+
+    getLatestRawDependencies(instIndex) {
+        const inst = this.instructions[instIndex];
+        const deps = [];
+        const seen = new Set();
+
+        this.getInstructionUses(inst).forEach(use => {
+            for (let j = instIndex - 1; j >= 0; j--) {
+                const olderInst = this.instructions[j];
+                if (olderInst.dest !== use.register) continue;
+
+                const key = `${olderInst.id}-${use.register}-${use.targetStage}`;
+                if (!seen.has(key)) {
+                    deps.push({ olderInst, use });
+                    seen.add(key);
+                }
+                break;
+            }
+        });
+
+        return deps;
+    }
+
+    buildSchedule() {
+        const hazardMessages = [];
+        const forwardingEvents = [];
+
         for (let i = 0; i < this.instructions.length; i++) {
             const inst = this.instructions[i];
-            const prev = prevStates[i];
+            const prev = this.instructions[i - 1];
 
-            let next = '';
+            let ifCycle = 1;
+            if (prev) {
+                ifCycle = this.pipelineType === 5
+                    ? Math.max(prev.timing.ifCycle + 1, prev.timing.idCycle)
+                    : prev.timing.ifCycle + 1;
+            }
 
-            /* -- SCENARIO : Instruction has not been launched yet -- */
-            if (prev === '' && !inst.stages.includes('IF')) {
-                /*
-                 * Launch When
-                 * a) First instruction (i = 0)
-                 * b) The previous instruction has already been fetched
-                 */
-                if (i === 0 || (prevStates[i-1] !== '' && prevStates[i-1] !== 'IF')) {
-                    next = 'IF';
+            let idCycle = ifCycle + 1;
+            let exCycle = idCycle + 1;
+            const rawDeps = [];
+            const loadUseDeps = [];
+            const forwardingDeps = [];
+
+            this.getLatestRawDependencies(i).forEach(({ olderInst, use }) => {
+                rawDeps.push(olderInst);
+
+                if (!this.forwarding) {
+                    idCycle = Math.max(idCycle, olderInst.timing.finalCycle + 1);
+                    return;
                 }
-            }
-            
-            /* -- SCENARIO : Instruction has already exited the pipeline -- */
-            else if (prev === pStages[pStages.length - 1] || (prev === '' && inst.stages.includes('IF'))) {
-                next = ''; // Nothing next for an instruction that has already exited the entire pipeline
-            }
-            
-            /* -- SCENARIO : If the instruction is still within the pipeline -- */
-            else {
-                /*
-                 * If the instruction was previously stalled, it must currently be stuck waiting
-                 * for the execution stage (EX). It will now attempt to move to the EX stage.
-                 * If it was not stalled, continue with whatever comes next
-                 */
-                let intended = (prev === 'STALL') ? 'EX' : pStages[pStages.indexOf(prev) + 1];
 
-                /* ---- 1. Check for Data Hazards ---- */
-                if (intended === 'EX') {
-                    let stall = false;
-                    let forwarded = false;
-
-                    /*
-                     * The program checks if any older instructions are
-                     * computing a value required for the src1 and src2
-                     * registers of the present instruction
-                     */
-                    for(let j = 0; j < i; j++) {
-                        const olderInst = this.instructions[j];
-
-                        if (olderInst.dest && (olderInst.dest === inst.src1 || olderInst.dest === inst.src2)) {
-                            const olderCurrent = olderInst.stages[this.cycle - 1];
-
-                            /*
-                             * If the older instruction is in EX, MEM, or WB, the data has 
-                             * not been physically committed to the register file yet.
-                             */
-                            if (olderCurrent === 'EX' || olderCurrent === 'MEM' || olderCurrent === 'WB' || olderCurrent === 'MEM_WB') {
-                                
-                                // Check for hardware bypass -- register forwarding
-                                if (!this.forwarding) {
-                                    stall = true; // Stall when lacking hardware bypass
-                                } else {
-                                    // Hardware has bypass
-                                    // Check for the Load-Use penalty
-                                    if (olderInst.opcode === 'LW' && (olderCurrent === 'EX' || olderCurrent === 'MEM')) {
-                                        /*
-                                         * Load-Use Exception: Even with forwarding, data from RAM 
-                                         * isn't available until the end of MEM. Pipeline is stalled
-                                         * by 1 tick.
-                                         */
-                                        stall = true;
-                                    } else {
-                                        forwarded = true;
-                                    }
-                                }
-                            }
+                if (olderInst.kind === 'LOAD') {
+                    const requiredUseCycle = olderInst.timing.memCycle + 1;
+                    if (use.targetStage === 'EX') {
+                        if (this.pipelineType === 5) {
+                            idCycle = Math.max(idCycle, requiredUseCycle - 1);
+                        } else {
+                            exCycle = Math.max(exCycle, requiredUseCycle);
                         }
-                    } // Damn that's quite a few nested if statemenets -- so mny brackets are always so scary
-
-                    // Apply the hazard check results --- forwarded to the UI
-                    if (stall) {
-                        next = 'STALL';
-                        const hazardMsg = `Cycle ${this.cycle}: RAW Hazard. Inst ${inst.id} delayed.`;
-                        if (!this.hazards.includes(hazardMsg)) this.hazards.push(hazardMsg);
-                    } else if (forwarded) {
-                        next = 'EX';
-                        const forwardMsg = `Cycle ${this.cycle}: Data forwarded to Inst ${inst.id}.`;
-                        if (!this.hazards.includes(forwardMsg)) this.hazards.push(forwardMsg);
                     } else {
-                        next = 'EX'; 
+                        exCycle = Math.max(exCycle, requiredUseCycle - 1);
                     }
-                } 
-                
-                /* ---- Check for Structural Hazards ---- */
-                else if (intended === 'ID') {
-                    /*
-                     * Traffic Jam Rule:
-                     * If the instruction directly ahead of us is stuck in ID or STALL, 
-                     * the decode hardware is physically occupied. We cannot enter ID 
-                     * and must remain stuck in IF for another tick.
-                     */
-                    if (i > 0 && (this.instructions[i-1].stages[this.cycle - 1] === 'STALL' || this.instructions[i-1].stages[this.cycle - 1] === 'ID')) {
-                        next = 'IF'; 
-                    } else {
-                        next = 'ID';
-                    }
-                } 
-                
-                /* ---- Normal Progression ---- */
-                else {
-                    next = intended;
+                    loadUseDeps.push(olderInst);
                 }
-            }
-
-            // Commit the calculated next stage to the instruction's telemetry array
-            inst.stages.push(next);
-        }
-    }
-
-    /* --- Function to auto-run the Loop --- */
-    runToEnd() {
-        const pStages = this.pipelineType === 5 ? ['IF', 'ID', 'EX', 'MEM', 'WB'] : ['IF', 'ID', 'EX', 'MEM_WB'];
-        const finalStage = pStages[pStages.length - 1];
-        
-        let safeGuard = 0; // Safe gaurd flag to ensure the program stops after n counts
-
-        while (safeGuard < 50) {
-            const allFinished = this.instructions.every(inst => {
-                /* * The .every() method checks if every capsule has finished its journey.
-                 * For an instruction to be considered 'retired', it must meet two criteria:
-                 * 1. It must have reached the end of the track -- finalStage.
-                 * 2. Its current state must be empty ('').
-                 */
-                const last = inst.stages[inst.stages.length - 1] || '';
-                return last === '' && inst.stages.includes(finalStage);
+                forwardingDeps.push({ olderInst, use });
             });
 
-            if (allFinished) break; // We're done here
+            if (this.pipelineType === 5 || !this.forwarding) {
+                exCycle = idCycle + 1;
+            } else {
+                exCycle = Math.max(exCycle, idCycle + 1);
+            }
 
-            // Else continue
-            this.step();
-            safeGuard++;
-        }       
+            if (prev) {
+                idCycle = Math.max(idCycle, prev.timing.idCycle + 1);
+                exCycle = Math.max(exCycle, idCycle + 1);
+            }
+
+            const memCycle = exCycle + 1;
+            const wbCycle = this.pipelineType === 5 ? memCycle + 1 : null;
+            const finalCycle = wbCycle || memCycle;
+
+            inst.timing = { ifCycle, idCycle, exCycle, memCycle, wbCycle, finalCycle };
+            inst.schedule = this.createSchedule(inst);
+            inst.stages = [];
+
+            if (this.forwarding) {
+                forwardingDeps.forEach(dep => {
+                    const event = this.createForwardingEvent(dep.olderInst, inst, dep.use);
+                    if (event) forwardingEvents.push(event);
+                });
+            }
+
+            if (rawDeps.length > 0) {
+                const depList = rawDeps.map(dep => dep.id).join(', ');
+                if (!this.forwarding) {
+                    hazardMessages.push(`${inst.id} waits for ${depList}: RAW hazard resolved by stall(s).`);
+                } else if (loadUseDeps.length > 0 && this.hasStall(inst)) {
+                    hazardMessages.push(`${inst.id} waits for ${loadUseDeps.map(dep => dep.id).join(', ')}: load-use RAW hazard.`);
+                }
+
+            }
+        }
+
+        this.fullHazards = [...new Set(hazardMessages)];
+        this.forwardingEvents = forwardingEvents;
     }
+
+    createForwardingEvent(olderInst, inst, use) {
+        const toCycle = use.targetStage === 'MEM' ? inst.timing.memCycle : inst.timing.exCycle;
+        const valueAlreadyInRegisterFile = inst.timing.idCycle > olderInst.timing.finalCycle;
+        if (valueAlreadyInRegisterFile) return null;
+
+        let fromStage = 'EX';
+        let fromCycle = olderInst.timing.exCycle;
+        let rule = use.targetStage === 'MEM' ? 'EX/MEM -> MEM' : 'EX/MEM -> EX';
+
+        if (olderInst.kind === 'LOAD') {
+            fromStage = 'MEM';
+            fromCycle = olderInst.timing.memCycle;
+            rule = use.targetStage === 'MEM' ? 'MEM/WB -> MEM' : 'MEM/WB -> EX';
+        } else if (toCycle === olderInst.timing.exCycle + 1) {
+            fromStage = 'EX';
+            fromCycle = olderInst.timing.exCycle;
+            rule = use.targetStage === 'MEM' ? 'EX/MEM -> MEM' : 'EX/MEM -> EX';
+        } else if (olderInst.timing.wbCycle && toCycle >= olderInst.timing.wbCycle) {
+            fromStage = 'WB';
+            fromCycle = olderInst.timing.wbCycle;
+            rule = use.targetStage === 'MEM' ? 'MEM/WB -> MEM' : 'MEM/WB -> EX';
+        } else {
+            fromStage = 'MEM';
+            fromCycle = olderInst.timing.memCycle;
+            rule = use.targetStage === 'MEM' ? 'MEM/WB -> MEM' : 'MEM/WB -> EX';
+        }
+
+        const loadNote = olderInst.kind === 'LOAD' && use.targetStage === 'EX'
+            ? ' after the load-use stall'
+            : '';
+        const displayRule = this.pipelineType === 4 && use.targetStage === 'MEM'
+            ? rule.replace(' -> MEM', ' -> MEM/WB')
+            : rule;
+
+        return {
+            id: `${olderInst.id}-${inst.id}-${use.register}-${use.targetStage}`,
+            fromInstruction: olderInst.id,
+            fromStage: this.getDisplayStage(fromStage),
+            fromCycle,
+            toInstruction: inst.id,
+            toStage: this.getDisplayStage(use.targetStage),
+            toCycle,
+            register: use.register,
+            role: use.role,
+            rule: displayRule,
+            text: `${olderInst.id} forwards ${use.register} from ${this.getDisplayStage(fromStage)} to ${inst.id} ${this.getDisplayStage(use.targetStage)} using ${displayRule}${loadNote}.`
+        };
+    }
+
+    createSchedule(inst) {
+        const schedule = [];
+        const { ifCycle, idCycle, exCycle, memCycle, wbCycle, finalCycle } = inst.timing;
+
+        schedule[ifCycle - 1] = 'IF';
+
+        for (let cycle = ifCycle + 1; cycle < idCycle; cycle++) {
+            schedule[cycle - 1] = 'ST';
+        }
+
+        schedule[idCycle - 1] = 'ID';
+
+        for (let cycle = idCycle + 1; cycle < exCycle; cycle++) {
+            schedule[cycle - 1] = 'ST';
+        }
+
+        schedule[exCycle - 1] = 'EX';
+        schedule[memCycle - 1] = this.getDisplayStage('MEM');
+
+        if (wbCycle) {
+            schedule[wbCycle - 1] = 'WB';
+        }
+
+        for (let cycle = 1; cycle <= finalCycle; cycle++) {
+            if (!schedule[cycle - 1]) schedule[cycle - 1] = '';
+        }
+
+        return schedule;
+    }
+
+    hasStall(inst) {
+        return inst.schedule.includes('ST');
+    }
+
+    step() {
+        if (this.instructions.length === 0 || this.errors.length > 0) return;
+
+        const maxCycle = this.getMaxCycle();
+        if (this.cycle >= maxCycle) return;
+
+        this.cycle++;
+        this.instructions.forEach(inst => {
+            inst.stages = inst.schedule.slice(0, this.cycle);
+        });
+        this.hazards = this.visibleHazards();
+        this.visibleForwardingEvents = this.getVisibleForwardingEvents();
+    }
+
+    runToEnd() {
+        if (this.instructions.length === 0 || this.errors.length > 0) return;
+
+        this.cycle = this.getMaxCycle();
+        this.instructions.forEach(inst => {
+            inst.stages = inst.schedule.slice(0, this.cycle);
+        });
+        this.hazards = this.fullHazards.slice();
+        this.visibleForwardingEvents = this.getVisibleForwardingEvents();
+    }
+
+    resetRun() {
+        this.cycle = 0;
+        this.hazards = [];
+        this.visibleForwardingEvents = [];
+        this.instructions.forEach(inst => {
+            inst.stages = [];
+        });
+    }
+
+    getMaxCycle() {
+        return Math.max(0, ...this.instructions.map(inst => inst.schedule.length));
+    }
+
+    visibleHazards() {
+        const activeHazards = [];
+        this.instructions.forEach(inst => {
+            const visible = inst.stages;
+            if (visible.includes('ST')) {
+                activeHazards.push(`${inst.id}: RAW hazard visible as stall(s).`);
+            }
+        });
+
+        if (this.cycle === this.getMaxCycle()) {
+            return this.fullHazards.slice();
+        }
+
+        return [...new Set(activeHazards)];
+    }
+
+    getVisibleForwardingEvents() {
+        if (!this.forwarding) return [];
+        return this.forwardingEvents.filter(event => event.toCycle <= this.cycle);
+    }
+}
+
+if (typeof module !== 'undefined') {
+    module.exports = { Instruction, PipelineSimulator };
 }
