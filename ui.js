@@ -1,3 +1,8 @@
+/*
+ * ui.js -- Pipeline Logic Datastructures
+ *
+ * Author: Esraaj Sarkar Gupta, Rohan Gupta
+ */
 function getStageDescription(inst, stage, cycle = null) {
     if (!inst || !inst.opcode) return '';
     switch(stage) {
