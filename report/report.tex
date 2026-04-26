@@ -53,7 +53,7 @@ The submission is a static web app. To run it, open \texttt{index.html} in a bro
 
 \section{Instruction Input}
 
-The applet accepts at most 10 non-empty instructions per simulation. Instructions are entered one per line in the input box. If any line cannot be parsed, the full input is rejected and no partial program is ingested. The error log reports the original line number and the reason the line failed to parse.
+The applet accepts at most 10 non-empty instructions per simulation. Instructions are entered one per line in the input box. Before loading a run, the user can add new lines, delete existing lines, or modify any instruction directly in the text area. If any line cannot be parsed, the full input is rejected and no partial program is ingested. The error log reports the original line number and the reason the line failed to parse.
 
 The accepted instruction formats are:
 
@@ -205,6 +205,22 @@ Important methods include:
 The applet includes preset test cases for both pipeline configurations. The preset list changes automatically when the user selects the 4-stage or 5-stage pipeline. These presets cover independent instructions, ALU RAW hazards, load-use hazards, chained overwrites, and store-data dependencies.
 
 These test cases demonstrate correctness against the timing assumptions. The evidence screenshots focus on two comparisons: 4-stage TC1 with and without forwarding, and 5-stage TC4 with and without forwarding. Together, these examples show how forwarding changes a direct ALU dependency, and how forwarding handles a store-data dependency after an independent instruction gap.
+
+\subsection{Testing Coverage}
+
+\begin{center}
+\begin{tabular}{p{0.24\textwidth}p{0.28\textwidth}p{0.38\textwidth}}
+\toprule
+Behaviour checked & Representative preset & Expected result \\
+\midrule
+No dependency & 5-stage TC1 & Both instructions progress without RAW stalls because they read and write independent registers. \\
+Simple arithmetic RAW & 4-stage TC1 and 5-stage TC2 & The consumer waits when forwarding is disabled; with forwarding enabled, the producer's ALU result is bypassed to the consumer. \\
+Load-use dependency & 4-stage TC3 and 5-stage TC3 & A direct consumer of a load result still shows one stall before the load value can be forwarded from the memory/completion path. \\
+Store-data forwarding & 4-stage TC6 and 5-stage TC4 & The store's data operand is consumed in the memory stage, so forwarding targets the store's memory/completion stage. \\
+Chained dependencies & 4-stage TC5, 5-stage TC5, and 5-stage TC6 & The simulator uses the latest prior writer for each source register and shows forwarding or stalls for each dependency in the chain. \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \subsection{4-Stage Pipeline Test Cases}
 
