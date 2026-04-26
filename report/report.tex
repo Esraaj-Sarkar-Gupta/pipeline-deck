@@ -1,0 +1,296 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+\newcommand{\screenshotplaceholder}[2]{
+    \begin{figure}[H]
+        \centering
+        \fbox{
+            \begin{minipage}[c][0.25\textheight][c]{0.88\textwidth}
+                \centering
+                \textbf{Screenshot placeholder}\\[0.5em]
+                #1
+            \end{minipage}
+        }
+        \caption{#2}
+    \end{figure}
+}
+
+\title{\textbf{Pipeline Hazard Simulation Applet Report}\\
+CS2011: Foundations of Computer Systems\\
+Lab Assignment II}
+\author{Rohan Gupta \and Esraaj Sarkar Gupta}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Objective}
+
+This project implements an interactive pipeline hazard simulation applet for a single-issue, in-order processor model. The applet allows a user to enter a short sequence of assembly-like instructions, select a 4-stage or 5-stage pipeline, optionally enable data forwarding, and observe the pipeline schedule cycle by cycle.
+
+The focus of the simulator is RAW (Read After Write) data hazards. The simulator does not model branch prediction, control hazards, structural hazards, caches, exceptions, interrupts, out-of-order execution, superscalar issue, or multi-cycle functional units.
+
+\section{How to Run the Applet}
+
+The submission is a static web app. To run it, open \texttt{index.html} in a browser from the project folder. The main source files are:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{index.html}: Defines the app layout and controls.
+    \item \texttt{style.css}: Defines the visual design, sticky instruction pane, pipeline table styling, tooltips, and forwarding arrows.
+    \item \texttt{pipeline.js}: Contains the parser, pipeline timing model, RAW hazard detection, stall insertion, and forwarding event generation.
+    \item \texttt{ui.js}: Connects the simulator state to the browser UI, including stepping, auto-run, reset, hazard logs, forwarding logs, tooltips, and table rendering.
+\end{itemize}
+
+\screenshotplaceholder{Insert a screenshot of the initial app screen showing the pipeline configuration panel, instruction input area, execution buttons, and empty pipeline visualization.}{Initial app interface.}
+
+\section{Instruction Input}
+
+The applet accepts at most 10 non-empty instructions per simulation. Instructions are entered one per line in the input box. If any line cannot be parsed, the full input is rejected and no partial program is ingested. The error log reports the original line number and the reason the line failed to parse.
+
+The accepted instruction formats are:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Instruction type & Format \\
+\midrule
+Arithmetic register & \texttt{ADD rd, rs, rt} \\
+Arithmetic register & \texttt{SUB rd, rs, rt} \\
+Arithmetic register & \texttt{AND rd, rs, rt} \\
+Arithmetic register & \texttt{OR rd, rs, rt} \\
+Immediate arithmetic & \texttt{ADDI rt, rs, imm} \\
+Immediate arithmetic & \texttt{ORI rt, rs, imm} \\
+Load & \texttt{LW rt, offset(base)} \\
+Store & \texttt{SW rt, offset(base)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Registers must use the form \texttt{R<number>}, for example \texttt{R1}, \texttt{R2}, or \texttt{R10}. Immediates and memory offsets must be integers. The assignment requires \texttt{ADD}, \texttt{SUB}, \texttt{LW}, and \texttt{SW}; the applet also supports \texttt{AND}, \texttt{OR}, \texttt{ADDI}, and \texttt{ORI}.
+
+\screenshotplaceholder{Insert a screenshot showing the hoverable ``i'' icon beside the instruction box, with the accepted command list visible.}{Accepted instruction formats shown in the UI.}
+
+\screenshotplaceholder{Insert a screenshot of an invalid instruction input, showing that the app rejects the full program and reports the exact line that failed.}{Invalid input handling.}
+
+\section{Pipeline Configurations}
+
+The applet supports two pipeline models:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{5-stage pipeline}: \texttt{IF}, \texttt{ID}, \texttt{EX}, \texttt{MEM}, \texttt{WB}.
+    \item \textbf{4-stage pipeline}: \texttt{IF}, \texttt{ID}, \texttt{EX}, \texttt{MEM/WB}. In this model, memory access and write-back are represented as one combined completion stage.
+\end{itemize}
+
+The selected pipeline changes the produced schedule. In the 4-stage pipeline, instructions complete earlier because \texttt{MEM} and \texttt{WB} are combined into \texttt{MEM/WB}.
+
+\screenshotplaceholder{Insert two screenshots using the same instruction sequence: one with the 5-stage pipeline selected and one with the 4-stage pipeline selected. The screenshots should show that the table differs between configurations.}{Comparison of 5-stage and 4-stage pipeline configurations.}
+
+\section{Pipeline Visualization and Interaction}
+
+The table displays instructions as rows and cycles as columns. Each populated cell shows the stage occupied by that instruction during that cycle. Empty cells indicate that the instruction has not yet started or has already completed.
+
+The instruction column remains visible while horizontally scrolling through cycles. The title ``Pipeline Visualization'' stays attached to the top of the visualization card rather than scrolling inside the table. The table grows only as cycles are rendered, so during step execution or auto-run the user can scroll only as far as the currently visible clock cycle.
+
+The applet supports:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Step}: advances the schedule by one cycle.
+    \item \textbf{Auto-Run}: advances one cycle every 600 ms until completion.
+    \item \textbf{Reset Run}: resets the current loaded program to cycle 0.
+    \item \textbf{Clear}: clears the input and loaded simulation.
+\end{itemize}
+
+\screenshotplaceholder{Insert a screenshot during auto-run or after several manual steps. It should show the sticky instruction pane, visible cycle columns, and the current partially rendered schedule.}{Cycle-by-cycle pipeline table.}
+
+\section{Hazard Detection}
+
+The simulator detects RAW hazards. For each instruction, the simulator checks the latest prior instruction that writes each source register. If a source register depends on an earlier result that is not yet available under the selected model, the consumer instruction is delayed by inserting explicit \texttt{ST} stall cells.
+
+WAR and WAW hazards are not modeled as baseline hazards because the simulator is single-issue and in-order. Control and structural hazards are also outside the simulator scope, matching the assignment requirements.
+
+When a stall appears, the visible cell says which register is being waited on, for example \texttt{Waiting for R1}. Hovering over the stall gives a more detailed explanation, such as which instruction is expected to produce that register value.
+
+\screenshotplaceholder{Insert a screenshot of a RAW hazard without forwarding. The screenshot should show red \texttt{ST} cells and the hover tooltip explaining the waiting register, for example ``Waiting for R1 from I1''.}{RAW hazard resolved through stalls.}
+
+\section{Forwarding Model}
+
+When forwarding is enabled, the simulator generates forwarding events for RAW dependencies that can be satisfied through bypassing. The UI highlights the source and target cells and draws a forwarding arrow. Hovering over an arrow shows which register is being forwarded and the source and destination stages.
+
+The forwarding model assumes a standard in-order MIPS-style datapath:
+
+\begin{itemize}[leftmargin=*]
+    \item ALU results may be forwarded to a later \texttt{EX} input.
+    \item Load data is available only after the load's memory stage, so a direct load-use dependency still requires one stall before forwarding.
+    \item Store data is consumed in the memory stage, so store-data dependencies can forward to that stage.
+    \item If a producer reaches \texttt{WB} or \texttt{MEM/WB} in the same cycle that a consumer is in \texttt{ID}, the value is treated as readable from the register file, so no unnecessary forwarding arrow is drawn for that case.
+    \item If multiple earlier instructions write the same register, the simulator uses the latest prior writer for the dependency, avoiding stale forwarding.
+\end{itemize}
+
+\screenshotplaceholder{Insert a screenshot of an arithmetic RAW dependency with forwarding enabled. It should show fewer or no stalls compared with the no-forwarding version and should show a forwarding arrow.}{Forwarding for an arithmetic RAW dependency.}
+
+\screenshotplaceholder{Insert a screenshot of a load-use dependency with forwarding enabled. It should show exactly one stall before the consumer proceeds, plus a forwarding arrow from the load result.}{Load-use hazard with forwarding.}
+
+\section{Implementation Structure}
+
+\subsection{\texttt{pipeline.js}}
+
+\texttt{pipeline.js} contains the core simulation logic. It defines:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{Instruction}: stores parsed instruction fields, source registers, destination register, schedule, visible stages, timing, and stall reasons.
+    \item \texttt{PipelineSimulator}: stores the loaded instructions, current cycle, pipeline type, forwarding mode, hazards, forwarding events, and parse errors.
+\end{itemize}
+
+Important methods include:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{loadInstructions}: validates all input lines before accepting the program.
+    \item \texttt{parseInstruction}: parses and validates supported instruction syntax.
+    \item \texttt{getLatestRawDependencies}: finds the most recent prior writer for each source register.
+    \item \texttt{buildSchedule}: computes instruction timing, stalls, hazard messages, and forwarding events.
+    \item \texttt{createSchedule}: converts timing into the visible cycle-by-cycle stage row.
+    \item \texttt{step}, \texttt{runToEnd}, and \texttt{resetRun}: control visible simulation progress.
+\end{itemize}
+
+\subsection{\texttt{ui.js}}
+
+\texttt{ui.js} renders the simulator state. It builds the table headers and cells for visible cycles only, renders hazard and forwarding logs, draws forwarding arrows, manages the sticky instruction shield, and implements auto-run as a 600 ms cycle-by-cycle loop.
+
+\subsection{\texttt{style.css}}
+
+\texttt{style.css} handles the visual presentation. It defines the dark interface, stage cell colors, stall styling, forwarding highlights, sticky instruction pane, forwarding arrow overlay, and responsive behavior.
+
+\section{Sample Test Cases}
+
+The applet includes preset test cases for both pipeline configurations. The preset list changes automatically when the user selects the 4-stage or 5-stage pipeline. These presets are based on the provided pipeline test case PDFs, converted into the applet's accepted \texttt{R<number>} register syntax.
+
+\subsection{4-Stage Pipeline Test Cases}
+
+When the 4-stage pipeline is selected, the preset dropdown contains the following six test cases:
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.72\textwidth}}
+\toprule
+Preset & Program \\
+\midrule
+TC1: ALU RAW &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{SUB R4, R1, R5}\\[0.35em]
+TC2: ALU RAW with gap &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{AND R6, R7, R8}\\
+& \texttt{SUB R4, R1, R5}\\[0.35em]
+TC3: Load-use RAW &
+\texttt{LW R1, 0(R2)}\\
+& \texttt{ADD R3, R1, R4}\\[0.35em]
+TC4: Load-use with gap &
+\texttt{LW R1, 0(R2)}\\
+& \texttt{ORI R6, R7, 7}\\
+& \texttt{ADD R3, R1, R4}\\[0.35em]
+TC5: Chained overwrite RAW &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{ADD R1, R1, R4}\\
+& \texttt{SUB R5, R1, R6}\\[0.35em]
+TC6: Store data RAW &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{SW R1, 0(R4)}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{4-Stage Evidence Screenshots}
+
+\screenshotplaceholder{Insert a screenshot of 4-stage TC1 with forwarding disabled. The screenshot should show \texttt{SUB} stalling while waiting for \texttt{R1}.}{4-stage TC1 without forwarding.}
+
+\screenshotplaceholder{Insert a screenshot of 4-stage TC1 with forwarding enabled. The screenshot should show the forwarding arrow and the shorter schedule compared with the no-forwarding screenshot.}{4-stage TC1 with forwarding.}
+
+\screenshotplaceholder{Insert a screenshot of 4-stage TC3 with forwarding enabled. The screenshot should show the load-use stall and the visible \texttt{Waiting for R1} stall label.}{4-stage TC3 load-use with forwarding.}
+
+\screenshotplaceholder{Insert a screenshot of 4-stage TC6 with forwarding enabled. The screenshot should show the store-data dependency being handled by forwarding to the store/completion stage.}{4-stage TC6 store-data forwarding.}
+
+\subsection{5-Stage Pipeline Test Cases}
+
+When the 5-stage pipeline is selected, the preset dropdown contains the following seven test cases:
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.72\textwidth}}
+\toprule
+Preset & Program \\
+\midrule
+TC1: No dependency &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{SUB R4, R5, R6}\\[0.35em]
+TC2: ALU RAW &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{SUB R4, R1, R5}\\[0.35em]
+TC3: Load-use RAW &
+\texttt{LW R1, 0(R2)}\\
+& \texttt{ADD R3, R1, R4}\\[0.35em]
+TC4: Store data with gap &
+\texttt{ADD R1, R2, R3}\\
+& \texttt{ADD R4, R5, R6}\\
+& \texttt{SW R1, 0(R7)}\\[0.35em]
+TC5: Load and ALU chain &
+\texttt{LW R1, 0(R2)}\\
+& \texttt{ADD R3, R1, R4}\\
+& \texttt{SUB R5, R3, R6}\\[0.35em]
+TC6: Load-add-store chain &
+\texttt{LW R8, 4(R2)}\\
+& \texttt{ADD R9, R8, R6}\\
+& \texttt{SW R9, 0(R10)}\\[0.35em]
+TC7: Longer mixed chain &
+\texttt{LW R1, 0(R2)}\\
+& \texttt{ADD R3, R1, R4}\\
+& \texttt{SUB R5, R3, R6}\\
+& \texttt{LW R7, 4(R2)}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{5-Stage Evidence Screenshots}
+
+\screenshotplaceholder{Insert a screenshot of 5-stage TC1 after auto-run completes. It should show no RAW stalls because the two instructions are independent.}{5-stage TC1 no-dependency case.}
+
+\screenshotplaceholder{Insert two screenshots of 5-stage TC2: one with forwarding disabled and one with forwarding enabled. The forwarding-enabled version should show a shorter schedule and a forwarding arrow.}{5-stage TC2 arithmetic RAW with and without forwarding.}
+
+\screenshotplaceholder{Insert a screenshot of 5-stage TC3 with forwarding enabled. It should show one load-use stall, then forwarding from the load result to the dependent \texttt{ADD}.}{5-stage TC3 load-use with forwarding.}
+
+\screenshotplaceholder{Insert a screenshot of 5-stage TC6 with forwarding enabled. It should show the load-add-store chain and forwarding events across the dependent instructions.}{5-stage TC6 load-add-store chain.}
+
+\section{Limitations}
+
+The simulator intentionally stays within the assignment scope. It does not simulate:
+
+\begin{itemize}[leftmargin=*]
+    \item branch or jump instructions,
+    \item control hazards,
+    \item structural hazards,
+    \item caches or memory latency,
+    \item exceptions or interrupts,
+    \item out-of-order execution,
+    \item superscalar issue,
+    \item multi-cycle functional units.
+\end{itemize}
+
+The applet is designed to make the behavior of simple in-order pipeline RAW hazards clear and visible rather than to reproduce every feature of a real processor.
+
+\section{Conclusion}
+
+The applet satisfies the assignment requirements for a compact interactive pipeline hazard simulator. It supports user-defined instruction sequences, both required pipeline configurations, cycle-by-cycle visualization, step and auto-run execution, reset behavior, RAW hazard detection, stall insertion, and forwarding visualization. The code is organized so that the simulation logic remains in \texttt{pipeline.js}, while rendering and interaction behavior are handled separately in \texttt{ui.js} and \texttt{style.css}.
+
+\end{document}

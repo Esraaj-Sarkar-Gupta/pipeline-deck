@@ -1,7 +1,7 @@
 /*
  * pipeline.js -- Pipeline Logic Datastructures
  *
- * Author: Esraaj Sarkar Gupta, Rohan Gupta, Kanishk Khandelwal
+ * Author: Esraaj Sarkar Gupta, Rohan Gupta
  */
 
 const ALU_OPS = new Set(['ADD', 'SUB', 'AND', 'OR']);
@@ -24,6 +24,7 @@ class Instruction {
         this.error = '';
         this.schedule = [];
         this.stages = [];
+        this.stallReasons = {};
         this.timing = {};
     }
 }
@@ -262,16 +263,23 @@ class PipelineSimulator {
             const rawDeps = [];
             const loadUseDeps = [];
             const forwardingDeps = [];
+            const stallReasons = [];
 
             this.getLatestRawDependencies(i).forEach(({ olderInst, use }) => {
                 rawDeps.push(olderInst);
 
                 if (!this.forwarding) {
+                    const oldIdCycle = idCycle;
                     idCycle = Math.max(idCycle, olderInst.timing.finalCycle + 1);
+                    if (idCycle > oldIdCycle) {
+                        stallReasons.push(`Waiting for ${use.register} from ${olderInst.id}`);
+                    }
                     return;
                 }
 
                 if (olderInst.kind === 'LOAD') {
+                    const oldIdCycle = idCycle;
+                    const oldExCycle = exCycle;
                     const requiredUseCycle = olderInst.timing.memCycle + 1;
                     if (use.targetStage === 'EX') {
                         if (this.pipelineType === 5) {
@@ -283,6 +291,9 @@ class PipelineSimulator {
                         exCycle = Math.max(exCycle, requiredUseCycle - 1);
                     }
                     loadUseDeps.push(olderInst);
+                    if (idCycle > oldIdCycle || exCycle > oldExCycle) {
+                        stallReasons.push(`Waiting for ${use.register} load value from ${olderInst.id}`);
+                    }
                 }
                 forwardingDeps.push({ olderInst, use });
             });
@@ -304,6 +315,7 @@ class PipelineSimulator {
 
             inst.timing = { ifCycle, idCycle, exCycle, memCycle, wbCycle, finalCycle };
             inst.schedule = this.createSchedule(inst);
+            inst.stallReasons = this.createStallReasons(inst, stallReasons);
             inst.stages = [];
 
             if (this.forwarding) {
@@ -330,7 +342,7 @@ class PipelineSimulator {
 
     createForwardingEvent(olderInst, inst, use) {
         const toCycle = use.targetStage === 'MEM' ? inst.timing.memCycle : inst.timing.exCycle;
-        const valueAlreadyInRegisterFile = inst.timing.idCycle > olderInst.timing.finalCycle;
+        const valueAlreadyInRegisterFile = inst.timing.idCycle >= olderInst.timing.finalCycle;
         if (valueAlreadyInRegisterFile) return null;
 
         let fromStage = 'EX';
@@ -373,6 +385,7 @@ class PipelineSimulator {
             register: use.register,
             role: use.role,
             rule: displayRule,
+            hoverText: `Forwarding ${use.register}: ${olderInst.id} ${this.getDisplayStage(fromStage)} C${fromCycle} to ${inst.id} ${this.getDisplayStage(use.targetStage)} C${toCycle}`,
             text: `${olderInst.id} forwards ${use.register} from ${this.getDisplayStage(fromStage)} to ${inst.id} ${this.getDisplayStage(use.targetStage)} using ${displayRule}${loadNote}.`
         };
     }
@@ -405,6 +418,22 @@ class PipelineSimulator {
         }
 
         return schedule;
+    }
+
+    createStallReasons(inst, stallReasons) {
+        const reasonByCycle = {};
+        const uniqueReasons = [...new Set(stallReasons)];
+        const reason = uniqueReasons.length > 0
+            ? uniqueReasons.join('; ')
+            : 'Waiting for the instruction ahead to clear the pipeline';
+
+        inst.schedule.forEach((stage, index) => {
+            if (stage === 'ST') {
+                reasonByCycle[index + 1] = reason;
+            }
+        });
+
+        return reasonByCycle;
     }
 
     hasStall(inst) {

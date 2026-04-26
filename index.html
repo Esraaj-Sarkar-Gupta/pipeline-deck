@@ -40,6 +40,7 @@
                         <input type="checkbox" id="enable-forwarding"
                             class="form-checkbox bg-slate-900 border-slate-600 text-blue-500 rounded">
                         <span>Enable Data Forwarding</span>
+                        <span id="forwarding-status" class="font-semibold text-red-300">Disabled</span>
                     </label>
                 </div>
 
@@ -48,11 +49,7 @@
                         <h2 class="text-lg font-semibold">Instructions</h2>
                         <select id="preset-dropdown"
                             class="max-w-[12rem] bg-slate-900 border border-slate-600 rounded p-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
-                            <option value="">Load Preset Example...</option>
-                            <option value="raw">RAW Hazard</option>
-                            <option value="store">Store Dependency</option>
-                            <option value="chain">Load Chain</option>
-                            <option value="loaduse">Load-Use Hazard</option>
+                            <option value="">Load Test Case...</option>
                         </select>
                     </div>
                     <p class="text-xs text-slate-400 mb-3">Max 10 instructions. Use one instruction per line.</p>
@@ -106,23 +103,25 @@
             </aside>
 
             <div class="space-y-4 min-w-0">
-                <div id="pipeline-viewer"
-                    class="bg-slate-800 p-3 sm:p-4 rounded-lg border border-slate-700 overflow-auto min-h-[280px] max-h-[72vh] custom-scrollbar">
-                    <h2 class="text-lg font-semibold mb-3">Pipeline Visualization</h2>
-                    <svg id="forwarding-overlay" class="forwarding-overlay" aria-hidden="true"></svg>
-                    <table class="pipeline-table w-max min-w-full text-left text-sm">
-                        <thead>
-                            <tr id="table-header" class="border-b border-slate-600 text-slate-400">
-                                <th class="instruction-cell py-2 px-3 font-medium">Inst</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-body">
-                            <tr>
-                                <td colspan="100%" class="py-8 text-center text-slate-500 italic">Load instructions to
-                                    begin simulation.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="pipeline-card bg-slate-800 rounded-lg border border-slate-700 min-h-[280px] max-h-[72vh] overflow-hidden">
+                    <h2 class="pipeline-card-title text-lg font-semibold">Pipeline Visualization</h2>
+                    <div id="pipeline-viewer" class="pipeline-scroll custom-scrollbar">
+                        <div id="instruction-shield" class="instruction-shield" aria-hidden="true"></div>
+                        <svg id="forwarding-overlay" class="forwarding-overlay" aria-hidden="true"></svg>
+                        <table class="pipeline-table w-max min-w-full text-left text-sm">
+                            <thead>
+                                <tr id="table-header" class="border-b border-slate-600 text-slate-400">
+                                    <th class="instruction-cell py-2 px-3 font-medium"><div class="instruction-pane">Inst</div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body">
+                                <tr>
+                                    <td colspan="100%" class="py-8 text-center text-slate-500 italic">Load instructions to
+                                        begin simulation.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="glass-panel p-4 rounded-lg border border-slate-700/50">
