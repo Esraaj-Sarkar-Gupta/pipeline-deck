@@ -125,7 +125,10 @@
                 </div>
 
                 <div class="glass-panel p-4 rounded-lg border border-slate-700/50">
-                    <h2 class="text-lg font-semibold mb-3 text-amber-200">Data Forwarding</h2>
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <h2 class="text-lg font-semibold text-amber-200">Data Forwarding</h2>
+                        <span id="forwarding-card-status" class="forwarding-mode-badge forwarding-mode-disabled">Disabled</span>
+                    </div>
                     <div id="forwarding-log" class="space-y-3 text-sm text-slate-300">
                         <p class="text-slate-500 italic">Enable forwarding and run a dependent sequence to see transfers.</p>
                     </div>

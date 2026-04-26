@@ -219,15 +219,15 @@ function drawForwardingArrows(simulator) {
     const defs = document.createElementNS(namespace, 'defs');
     const marker = document.createElementNS(namespace, 'marker');
     marker.setAttribute('id', 'forward-arrowhead');
-    marker.setAttribute('markerWidth', '7');
-    marker.setAttribute('markerHeight', '7');
-    marker.setAttribute('refX', '6');
-    marker.setAttribute('refY', '3.5');
+    marker.setAttribute('markerWidth', '9');
+    marker.setAttribute('markerHeight', '9');
+    marker.setAttribute('refX', '7.5');
+    marker.setAttribute('refY', '4.5');
     marker.setAttribute('orient', 'auto');
     const arrowHead = document.createElementNS(namespace, 'path');
-    arrowHead.setAttribute('d', 'M 0 0 L 7 3.5 L 0 7 z');
+    arrowHead.setAttribute('d', 'M 0 0 L 9 4.5 L 0 9 z');
     arrowHead.setAttribute('fill', '#fbbf24');
-    arrowHead.setAttribute('fill-opacity', '0.72');
+    arrowHead.setAttribute('fill-opacity', '0.82');
     marker.appendChild(arrowHead);
     defs.appendChild(marker);
     overlay.appendChild(defs);
@@ -253,8 +253,8 @@ function drawForwardingArrows(simulator) {
         path.setAttribute('class', 'forwarding-path');
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke', '#fbbf24');
-        path.setAttribute('stroke-width', '1.6');
-        path.setAttribute('stroke-opacity', '0.72');
+        path.setAttribute('stroke-width', '2.4');
+        path.setAttribute('stroke-opacity', '0.82');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('marker-end', 'url(#forward-arrowhead)');
 
@@ -334,13 +334,22 @@ function setInputControlsDisabled(disabled) {
 
 function updateForwardingStatusLabel() {
     const status = document.getElementById('forwarding-status');
+    const cardStatus = document.getElementById('forwarding-card-status');
     const forwardingEnabled = document.getElementById('enable-forwarding').checked;
-    if (!status) return;
 
-    status.innerText = forwardingEnabled ? 'Enabled' : 'Disabled';
-    status.className = forwardingEnabled
-        ? 'font-semibold text-emerald-300'
-        : 'font-semibold text-red-300';
+    if (status) {
+        status.innerText = forwardingEnabled ? 'Enabled' : 'Disabled';
+        status.className = forwardingEnabled
+            ? 'font-semibold text-emerald-300'
+            : 'font-semibold text-red-300';
+    }
+
+    if (cardStatus) {
+        cardStatus.innerText = forwardingEnabled ? 'Enabled' : 'Disabled';
+        cardStatus.className = forwardingEnabled
+            ? 'forwarding-mode-badge forwarding-mode-enabled'
+            : 'forwarding-mode-badge forwarding-mode-disabled';
+    }
 }
 
 function stopAutoRun() {

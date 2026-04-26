@@ -196,6 +196,28 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(251, 191, 36, 0.38), 0 2px 6px rgba(251, 191, 36, 0.18);
 }
 
+.forwarding-mode-badge {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    border: 1px solid;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.forwarding-mode-enabled {
+    border-color: rgba(52, 211, 153, 0.38);
+    background: rgba(16, 185, 129, 0.13);
+    color: #6ee7b7;
+}
+
+.forwarding-mode-disabled {
+    border-color: rgba(248, 113, 113, 0.38);
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+}
+
 .forwarding-overlay {
     position: absolute;
     inset: 0;
@@ -214,7 +236,7 @@
 
 .forwarding-path:hover {
     stroke-opacity: 1;
-    stroke-width: 2.1;
+    stroke-width: 3.2;
 }
 
 /* Tooltip styles */
