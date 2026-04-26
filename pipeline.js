@@ -1,9 +1,10 @@
 /*
- * pipeline.js -- Pipeline Logic Datastructures
+ * pipeline.js -- pipeline logic data structures
  *
- * Author: Esraaj Sarkar Gupta, Rohan Gupta
+ * author: esraaj sarkar gupta, rohan gupta
  */
 
+// supported op groups and input validation limits.
 const ALU_OPS = new Set(['ADD', 'SUB', 'AND', 'OR']);
 const IMM_OPS = new Set(['ADDI', 'ORI']);
 const MAX_INSTRUCTIONS = 10;
@@ -12,6 +13,7 @@ const INTEGER_PATTERN = /^-?\d+$/;
 
 class Instruction {
     constructor(rawText, id) {
+        // parsed fields stay on the instruction so timing and ui can share one object.
         this.id = id;
         this.rawText = rawText.trim();
         this.opcode = null;
@@ -51,6 +53,7 @@ class PipelineSimulator {
     }
 
     loadInstructions(rawTextArray) {
+        // parse the whole program first; accept nothing if any line is invalid.
         const nonEmptyLines = rawTextArray
             .map((line, idx) => ({ text: line.trim(), lineNumber: idx + 1 }))
             .filter(line => line.text !== '');
@@ -89,6 +92,7 @@ class PipelineSimulator {
     }
 
     parseInstruction(inst) {
+        // each parser records destination and source registers used by raw checks.
         const raw = inst.rawText.trim();
         const opcode = raw.split(/\s+/, 1)[0]?.toUpperCase() || null;
         inst.opcode = opcode;
@@ -193,6 +197,7 @@ class PipelineSimulator {
         if (!olderInst.dest) return [];
 
         if (inst.opcode === 'SW') {
+            // store base is needed in ex; store data is not consumed until mem.
             const uses = [];
             if (inst.src1 === olderInst.dest) {
                 uses.push({ register: inst.src1, targetStage: 'MEM', role: 'store data' });
@@ -222,6 +227,7 @@ class PipelineSimulator {
     }
 
     getLatestRawDependencies(instIndex) {
+        // walk backward so repeated writes use the newest prior producer.
         const inst = this.instructions[instIndex];
         const deps = [];
         const seen = new Set();
@@ -244,6 +250,7 @@ class PipelineSimulator {
     }
 
     buildSchedule() {
+        // compute the full timing table once; stepping only reveals it cycle by cycle.
         const hazardMessages = [];
         const forwardingEvents = [];
 
@@ -269,6 +276,7 @@ class PipelineSimulator {
                 rawDeps.push(olderInst);
 
                 if (!this.forwarding) {
+                    // without bypasses, consumers wait until after the producer completes.
                     const oldIdCycle = idCycle;
                     idCycle = Math.max(idCycle, olderInst.timing.finalCycle + 1);
                     if (idCycle > oldIdCycle) {
@@ -278,6 +286,7 @@ class PipelineSimulator {
                 }
 
                 if (olderInst.kind === 'LOAD') {
+                    // load data appears after mem, so a direct load-use still stalls.
                     const oldIdCycle = idCycle;
                     const oldExCycle = exCycle;
                     const requiredUseCycle = olderInst.timing.memCycle + 1;
@@ -299,6 +308,7 @@ class PipelineSimulator {
             });
 
             if (this.pipelineType === 5 || !this.forwarding) {
+                // in these modes, ex is tied directly to the chosen id cycle.
                 exCycle = idCycle + 1;
             } else {
                 exCycle = Math.max(exCycle, idCycle + 1);
@@ -341,6 +351,7 @@ class PipelineSimulator {
     }
 
     createForwardingEvent(olderInst, inst, use) {
+        // skip arrows when the id-stage register read can already see the value.
         const toCycle = use.targetStage === 'MEM' ? inst.timing.memCycle : inst.timing.exCycle;
         const valueAlreadyInRegisterFile = inst.timing.idCycle >= olderInst.timing.finalCycle;
         if (valueAlreadyInRegisterFile) return null;
@@ -391,6 +402,7 @@ class PipelineSimulator {
     }
 
     createSchedule(inst) {
+        // convert timing numbers into the visible row of stage labels and stalls.
         const schedule = [];
         const { ifCycle, idCycle, exCycle, memCycle, wbCycle, finalCycle } = inst.timing;
 
@@ -447,6 +459,7 @@ class PipelineSimulator {
         if (this.cycle >= maxCycle) return;
 
         this.cycle++;
+        // reveal only the prefix of each precomputed schedule.
         this.instructions.forEach(inst => {
             inst.stages = inst.schedule.slice(0, this.cycle);
         });
