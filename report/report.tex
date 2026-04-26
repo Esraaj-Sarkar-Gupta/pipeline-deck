@@ -16,20 +16,6 @@
     urlcolor=blue
 }
 
-\newcommand{\screenshotplaceholder}[2]{
-    \begin{figure}[H]
-        \centering
-        \fbox{
-            \begin{minipage}[c][0.25\textheight][c]{0.88\textwidth}
-                \centering
-                \textbf{Screenshot placeholder}\\[0.5em]
-                #1
-            \end{minipage}
-        }
-        \caption{#2}
-    \end{figure}
-}
-
 \newcommand{\screenshotfigure}[3][0.95\textwidth]{
     \begin{figure}[H]
         \centering
@@ -146,7 +132,7 @@ The applet is used from left to right. The left sidebar defines the simulation i
     \item Use \textbf{Reset Run} to return the loaded program to cycle 0, or \textbf{Clear} to remove the program and reset the interface.
 \end{enumerate}
 
-\screenshotplaceholder{Annotated screenshot of the left sidebar, labeling the pipeline selector, forwarding toggle, preset dropdown, instruction input, Load/Clear buttons, and Step/Auto-Run/Reset Run buttons.}{Left sidebar controls.}
+\screenshotfigure[0.5\textwidth]{images/Left_sidebar.png}{Left sidebar controls.}
 
 \subsection*{Reading the Output Cards}
 
@@ -156,7 +142,7 @@ The Data Forwarding card shows whether forwarding is enabled or disabled, states
 
 The Detected Hazards card lists parse errors before a program is loaded and visible RAW hazards during execution. Stall cells in the pipeline table also show the blocked register, and hovering over a stall cell gives a more detailed reason.
 
-\screenshotplaceholder{Annotated screenshot of the right-side cards, labeling the Pipeline Visualization table, Data Forwarding card, forwarding arrows/tooltips, and Detected Hazards card.}{Right-side output cards.}
+\screenshotfigure{images/Right_sidebar.png}{Right-side output cards.}
 
 \section{Hazard Detection}
 
@@ -218,7 +204,7 @@ Important methods include:
 
 The applet includes preset test cases for both pipeline configurations. The preset list changes automatically when the user selects the 4-stage or 5-stage pipeline. These presets cover independent instructions, ALU RAW hazards, load-use hazards, chained overwrites, and store-data dependencies.
 
-These test cases demonstrate correctness against the timing assumptions. The evidence screenshots focus on two comparisons: 4-stage TC1 with and without forwarding, and 5-stage TC6 with and without forwarding. Together, these examples show how forwarding changes a direct ALU dependency, and how forwarding handles a load-add-store dependency chain.
+These test cases demonstrate correctness against the timing assumptions. The evidence screenshots focus on two comparisons: 4-stage TC1 with and without forwarding, and 5-stage TC4 with and without forwarding. Together, these examples show how forwarding changes a direct ALU dependency, and how forwarding handles a store-data dependency after an independent instruction gap.
 
 \subsection{4-Stage Pipeline Test Cases}
 
@@ -301,9 +287,9 @@ TC7: Longer mixed chain &
 
 \subsubsection*{5-Stage Evidence Screenshots}
 
-\screenshotplaceholder{5-stage TC6 with forwarding disabled, showing stalls across the load-add-store dependency chain.}{5-stage TC6 without forwarding.}
+\screenshotfigure{images/5_stage_TC4_wo_forwarding.png}{5-stage TC4 without forwarding.}
 
-\screenshotplaceholder{5-stage TC6 with forwarding enabled, showing the load-use stall, the load-to-\texttt{ADD} forwarding event, and the \texttt{ADD}-to-\texttt{SW} store-data forwarding event.}{5-stage TC6 with forwarding.}
+\screenshotfigure{images/5_stage_tc4_with_forwarding.png}{5-stage TC4 with forwarding.}
 
 \section{Limitations}
 

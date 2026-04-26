@@ -18,13 +18,13 @@
         </div>
     </div>
 
-    <div class="max-w-[1600px] mx-auto space-y-4 lg:space-y-6">
+    <div class="app-shell w-full space-y-4 lg:space-y-6">
         <header class="border-b border-slate-700 pb-3">
             <h1 class="text-2xl sm:text-3xl font-bold text-blue-400">Plaksha Orbital Pipeline Deck</h1>
             <p class="text-slate-400 mt-1 text-sm sm:text-base">Single-issue, in-order pipeline simulator for RAW hazard detection.</p>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-[20rem,minmax(0,1fr)] 2xl:grid-cols-[22rem,minmax(0,1fr)] gap-4 lg:gap-6 items-start">
+        <div class="app-grid grid grid-cols-1 md:grid-cols-[20rem,minmax(0,1fr)] 2xl:grid-cols-[22rem,minmax(0,1fr)] gap-4 lg:gap-6 items-start">
             <aside class="space-y-4 md:sticky md:top-4">
 
                 <div class="glass-panel p-4 rounded-lg border border-slate-700/50">
@@ -102,8 +102,8 @@
                 </div>
             </aside>
 
-            <div class="space-y-4 min-w-0">
-                <div class="pipeline-card bg-slate-800 rounded-lg border border-slate-700 min-h-[280px] max-h-[72vh] overflow-hidden">
+            <div class="app-main space-y-4 min-w-0">
+                <div class="pipeline-card bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
                     <h2 class="pipeline-card-title text-lg font-semibold">Pipeline Visualization</h2>
                     <div id="pipeline-viewer" class="pipeline-scroll custom-scrollbar">
                         <div id="instruction-shield" class="instruction-shield" aria-hidden="true"></div>

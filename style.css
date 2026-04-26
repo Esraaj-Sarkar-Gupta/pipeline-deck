@@ -24,10 +24,26 @@
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
+.app-shell {
+    min-height: calc(100vh - 1.5rem);
+}
+
+.app-grid {
+    min-height: calc(100vh - 7.5rem);
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 7.5rem);
+}
+
 .pipeline-card {
     position: relative;
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: clamp(20rem, 58vh, 52rem);
 }
 
 .pipeline-card-title {
@@ -332,6 +348,16 @@ thead .instruction-cell {
 }
 
 @media (max-width: 640px) {
+    .app-shell,
+    .app-grid,
+    .app-main {
+        min-height: auto;
+    }
+
+    .pipeline-card {
+        min-height: 18rem;
+    }
+
     .instruction-cell {
         width: 11rem;
         min-width: 11rem;
